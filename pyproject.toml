@@ -7,8 +7,25 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+aiogram = "^2.23.1"
+requests = "^2.31.0"
+bs4 = "^0.0.1"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.mypy.overrides]]
+module = [
+  "requests",
+  "bs4",
+  "aiogram",
+  "aiogram.dispatcher.filters",
+  "aiogram.dispatcher.filters.state",
+  "aiogram.types",
+  "aiogram.utils",
+  "aiogram.utils.callback_data",
+  "aiogram.dispatcher",
+]
+ignore_missing_imports = true
