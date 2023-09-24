@@ -27,5 +27,6 @@ module = [
   "aiogram.utils",
   "aiogram.utils.callback_data",
   "aiogram.dispatcher",
+  "aiogram.contrib.fsm_storage.memory",
 ]
 ignore_missing_imports = true

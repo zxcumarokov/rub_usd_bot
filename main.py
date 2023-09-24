@@ -7,6 +7,7 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
 
 # TOKEN = "5991863328:AAHf0Fyz3rtMR8851RF3xfyqdzIYNNDbVnM"
@@ -16,7 +17,8 @@ if not TOKEN:
 
 # cb = CallbackData("ikb", "action")  # cb filter
 bot = Bot(token=TOKEN)
-dp = Dispatcher(bot)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 
 
 # Глобальная переменная для хранения текущего курса
@@ -59,7 +61,7 @@ async def start(message: types.Message):
 
 
 # Обработчик нажатия на кнопку "Доллары в рубли"
-@dp.callback_query_handler(func=lambda c: (c.data == "usd_to_rub"))
+@dp.callback_query_handler(lambda c: (c.data == "usd_to_rub"))
 async def process_callback_button1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     await Form.waiting_for_usd.set()
@@ -69,7 +71,7 @@ async def process_callback_button1(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия на кнопку "Рубли в доллары"
-@dp.callback_query_handler(func=lambda c: (c.data == "rub_to_usd"))
+@dp.callback_query_handler(lambda c: (c.data == "rub_to_usd"))
 async def process_callback_button2(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     await Form.waiting_for_rub.set()
