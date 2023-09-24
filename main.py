@@ -29,8 +29,17 @@ class Form(StatesGroup):
     waiting_for_rub = State()
 
 
+def is_float(string: str) -> bool:
+    string = string.replace(",", ".")
+    try:
+        float(string)
+        return True
+    except ValueError:
+        return False
+
+
 # Функция для обновления данных о курсе
-def update_exchange_rate() -> float | None:
+async def update_exchange_rate() -> float | None:
     url = "https://www.google.com/finance/quote/USD-RUB?sa=X&ved=2ahUKEwjoxe30pcCBAxW3AhAIHfMmAxYQmY0JegQIDRAr"
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"  # noqa E501
@@ -82,12 +91,12 @@ async def process_callback_button2(callback_query: types.CallbackQuery):
 
 
 # Обработчик ввода количества рублей
-@dp.message_handler(lambda message: message.text.isdigit(), state=Form.waiting_for_rub)
+@dp.message_handler(lambda message: is_float(message.text), state=Form.waiting_for_rub)
 async def process_rub_amount(message: types.Message, state: FSMContext):
     await state.finish()
     user_id = message.from_user.id
-    rub_amount = float(message.text)
-    rate = update_exchange_rate()
+    rub_amount = float(message.text.replace(",", "."))
+    rate = await update_exchange_rate()
     if not rate:
         await message.answer("Не удалось получить курс обмена")
         return
@@ -96,12 +105,12 @@ async def process_rub_amount(message: types.Message, state: FSMContext):
 
 
 # Обработчик ввода количества долларов
-@dp.message_handler(lambda message: message.text.isdigit(), state=Form.waiting_for_usd)
+@dp.message_handler(lambda message: is_float(message.text), state=Form.waiting_for_usd)
 async def process_usd_amount(message: types.Message, state: FSMContext):
     await state.finish()
     user_id = message.from_user.id
-    usd_amount = float(message.text)
-    rate = update_exchange_rate()
+    usd_amount = float(message.text.replace(",", "."))
+    rate = await update_exchange_rate()
     if not rate:
         await message.answer("Не удалось получить курс обмена")
         return
