@@ -1,0 +1,3 @@
+#добавим config в gitignore
+echo "config" >> .gitignore
+config.py
