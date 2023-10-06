@@ -1,3 +1,4 @@
-#добавим config в gitignore
-echo "config" >> .gitignore
+# добавим config.py в .gitignore
 config.py
+```
+
