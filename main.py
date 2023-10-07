@@ -1,45 +1,23 @@
-import os  # noqa E402
-
 import requests
-from aiogram import Bot, Dispatcher, executor, types  # mid
+from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import InlineKeyboardButton
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from bs4 import BeautifulSoup
-from sqlalchemy import BigInteger
-from sqlalchemy import Column, Integer, String
-from sqlalchemy import create_engine
-from sqlalchemy import delete
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, delete, select
+from sqlalchemy.orm import Session
 
-from config import TOKEN  # noqa E402
-from config import db_url  # noqa E402
+from config import TOKEN, db_url
+from models import Language, Phrase
+
+engine = create_engine(db_url, echo=True)
 
 # cb = CallbackData("ikb", "action")  # cb filter
 bot = Bot(token=TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
-user_id = 0  # Глобальная переменная для хранения ID пользователя
-# Глобальная переменная для хранения выбранного языка
-language = None
 
-# Словарь с текстами кнопок на разных языках
-button_texts = {
-    "ru": {
-        "usd_to_rub": "Доллары в рубли",
-        "rub_to_usd": "Рубли в доллары",
-    },
-    "en": {
-        "usd_to_rub": "Dollars to Rubles",
-        "rub_to_usd": "Rubles to Dollars",
-    },
-}
-
-
-# Глобальная переменная для хранения текущего курса
 
 # Класс для хранения состояний
 class Form(StatesGroup):
@@ -61,7 +39,7 @@ async def update_exchange_rate() -> float | None:
     url = "https://www.google.com/finance/quote/USD-RUB?sa=X&ved=2ahUKEwjoxe30pcCBAxW3AhAIHfMmAxYQmY0JegQIDRAr"
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/117.0.0.0 Safari/537.36"
+        "Chrome/117.0.0.0 Safari/537.36"
         # noqa E501
     }
     full_page = requests.get(url, headers=headers)
@@ -75,7 +53,7 @@ async def update_exchange_rate() -> float | None:
 
 
 # Функция для создания клавиатуры
-def get_keyboard() -> InlineKeyboardMarkup:
+def get_direction_keyboard() -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup()
     keyboard.add(InlineKeyboardButton("Доллары в рубли", callback_data="usd_to_rub"))
     keyboard.add(InlineKeyboardButton("Рубли в доллары", callback_data="rub_to_usd"))
@@ -84,29 +62,42 @@ def get_keyboard() -> InlineKeyboardMarkup:
 
 
 # Функция для создания клавиатуры на нужном языке
-def get_keyboard2(language2):
+def get_languages_keyboard() -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup()
-    for button_data, button_text in button_texts.get(language2, {}).items():
-        keyboard.add(InlineKeyboardButton(button_text, callback_data=button_data))
+    with Session(engine) as session:
+        languages = session.scalars(select(Language)).all()
+        for language in languages:
+            keyboard.add(
+                InlineKeyboardButton(
+                    text=language.name,
+                    callback_data=f"set_language_{language.name}",
+                )
+            )
     return keyboard
 
 
 # Измененный обработчик команды /start
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
-    user_id2 = message.from_user.id
+    user_id = message.from_user.id
     # Проверяем наличие пользователя в базе данных
-    existing_user = session.query(Language).filter_by(user_id=user_id2).first()
-    if existing_user:
-        # Пользователь уже есть в базе, предложить выбор операции
-        await message.answer(get_operation_message(existing_user.language),
-                             reply_markup=get_keyboard2(existing_user.language))
-    else:
-        # Пользователь отсутствует в базе, предложить выбор языка
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("🇷🇺 Русский", callback_data="set_language_ru"))
-        markup.add(InlineKeyboardButton("🇺🇸 English", callback_data="set_language_en"))
-        await message.answer("Выберите язык:", reply_markup=markup)
+    with Session(engine) as session:
+        user = session.scalars(
+            select(User)
+            .where(User.id == user_id)
+        ).one_or_none()
+        
+        if user is not None:
+            await message.answer(
+                get_operation_message(existing_user.language),
+                reply_markup=get_keyboard2(existing_user.language),
+            )
+        else:
+            # Пользователь отсутствует в базе, предложить выбор языка
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton("🇷🇺 Русский", callback_data="set_language_ru"))
+            markup.add(InlineKeyboardButton("🇺🇸 English", callback_data="set_language_en"))
+            await message.answer("Выберите язык:", reply_markup=markup)
 
 
 def get_operation_message(language):
@@ -133,8 +124,11 @@ async def set_user_language(callback_query: types.CallbackQuery):
     session.commit()
 
     # После выбора языка, предложите выбрать операцию
-    await bot.send_message(user_id, get_operation_message(selected_language),
-                           reply_markup=get_keyboard2(selected_language))
+    await bot.send_message(
+        user_id,
+        get_operation_message(selected_language),
+        reply_markup=get_keyboard2(selected_language),
+    )
 
 
 # Обработчик команды /language
@@ -150,7 +144,9 @@ async def set_language(message: types.Message):
 
 def get_user_language(user_id):
     user_language = session.query(Language).filter_by(user_id=user_id).first()
-    return user_language.language if user_language else "en"  # Вернуть английский язык по умолчанию, если язык не
+    return (
+        user_language.language if user_language else "en"
+    )  # Вернуть английский язык по умолчанию, если язык не
     # найден
 
 
@@ -162,13 +158,9 @@ async def process_callback_button1(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     language = get_user_language(user_id)  # Получаем язык пользователя
     if language == "ru":
-        await bot.send_message(
-            user_id, f"Введите количество долларов для конвертации:"
-        )
+        await bot.send_message(user_id, f"Введите количество долларов для конвертации:")
     elif language == "en":
-        await bot.send_message(
-            user_id, f"Enter the amount of dollars to convert:"
-        )
+        await bot.send_message(user_id, f"Enter the amount of dollars to convert:")
 
 
 @dp.callback_query_handler(lambda c: c.data in ["set_language_ru", "set_language_en"])
@@ -219,9 +211,7 @@ async def process_rub_amount(message: types.Message, state: FSMContext):
     usd = round(usd, 2)
 
     if language == "ru":
-        await bot.send_message(
-            user_id, f"{rub_amount} рублей равно {usd} долларов"
-        )
+        await bot.send_message(user_id, f"{rub_amount} рублей равно {usd} долларов")
     elif language == "en":
         await bot.send_message(
             user_id, f"{rub_amount} rubles is equal to {usd} dollars"
@@ -245,9 +235,7 @@ async def process_usd_amount(message: types.Message, state: FSMContext):
     rub = round(rub, 2)
 
     if language == "ru":
-        await bot.send_message(
-            user_id, f"{usd_amount} долларов равно {rub} рублей"
-        )
+        await bot.send_message(user_id, f"{usd_amount} долларов равно {rub} рублей")
     elif language == "en":
         await bot.send_message(
             user_id, f"{usd_amount} dollars is equal to {rub} rubles"
@@ -256,31 +244,17 @@ async def process_usd_amount(message: types.Message, state: FSMContext):
 
 ################DB##################### # noqa E501
 
-Base = declarative_base()
-
-
-class Language(Base):
-    __tablename__ = 'languages'
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, nullable=False)  # Изменяем тип на BigInteger
-    language = Column(String(10), nullable=False)
-
-    def __init__(self, user_id, language):
-        self.user_id = user_id
-        self.language = language
+# Base = declarative_base()
 
 
 # Создаем соединение с БД
-engine = create_engine(db_url,
-                       echo=True)  # Или другой URI для твоей базы данных
 
 # Создаем таблицу
-Base.metadata.create_all(engine)
+# Base.metadata.create_all(engine)
 
 # Создаем сессию для работы с БД
-Session = sessionmaker(bind=engine)
-session = Session()
+# Session = sessionmaker(bind=engine)
+# session = Session()
 
 
 def delete_all_data(session):
@@ -302,7 +276,7 @@ def delete_all_data(session):
 # Пример запроса данных из таблицы languages
 languages = session.query(Language).all()
 for language in languages:
-    print(f'User ID: {language.user_id}, Language: {language.language}')
+    print(f"User ID: {language.user_id}, Language: {language.language}")
 
 # Не забудь закрыть сессию при завершении работы
 session.close()

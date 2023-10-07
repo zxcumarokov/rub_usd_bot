@@ -30,5 +30,7 @@ module = [
     "aiogram.utils.callback_data",
     "aiogram.dispatcher",
     "aiogram.contrib.fsm_storage.memory",
+    "sqlalchemy",
+    "sqlalchemy.orm",
 ]
 ignore_missing_imports = true
