@@ -5,13 +5,13 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from bs4 import BeautifulSoup
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from config import TOKEN, db_url
+from config import TOKEN
 from models import Language, Phrase
 
-engine = create_engine(db_url, echo=True)
+from db_engine import engine
 
 # cb = CallbackData("ikb", "action")  # cb filter
 bot = Bot(token=TOKEN)
@@ -88,8 +88,13 @@ async def start(message: types.Message):
         ).one_or_none()
         
         if user is not None:
+            message_text = session.scalars(
+                select(Phrase)
+                .where(Phrase.language_id == user.language_id)
+                .where(Phrase.phrase_code == "start")
+            ).one_or_none()
             await message.answer(
-                get_operation_message(existing_user.language),
+                text=,
                 reply_markup=get_keyboard2(existing_user.language),
             )
         else:
@@ -98,15 +103,6 @@ async def start(message: types.Message):
             markup.add(InlineKeyboardButton("🇷🇺 Русский", callback_data="set_language_ru"))
             markup.add(InlineKeyboardButton("🇺🇸 English", callback_data="set_language_en"))
             await message.answer("Выберите язык:", reply_markup=markup)
-
-
-def get_operation_message(language):
-    if language == "ru":
-        return "Выберите операцию:"
-    elif language == "en":
-        return "Choose an operation:"
-    else:
-        return "Выберите операцию / Choose an operation:"
 
 
 # Обработчик нажатия на кнопку выбора языка
