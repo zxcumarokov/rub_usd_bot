@@ -1,25 +1,18 @@
 import os  # noqa E402
+
 import requests
-from bs4 import BeautifulSoup
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Bot, Dispatcher, executor, types  # mid
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InlineKeyboardButton
 from aiogram.types import InlineKeyboardMarkup
-from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.dispatcher import FSMContext
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from bs4 import BeautifulSoup
 from sqlalchemy import BigInteger
+from sqlalchemy import Column, Integer, String
+from sqlalchemy import create_engine
 from sqlalchemy import delete
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-
-from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from config import TOKEN  # noqa E402
@@ -67,7 +60,8 @@ def is_float(string: str) -> bool:  # noqa E501
 async def update_exchange_rate() -> float | None:
     url = "https://www.google.com/finance/quote/USD-RUB?sa=X&ved=2ahUKEwjoxe30pcCBAxW3AhAIHfMmAxYQmY0JegQIDRAr"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/117.0.0.0 Safari/537.36"
         # noqa E501
     }
     full_page = requests.get(url, headers=headers)
@@ -90,9 +84,9 @@ def get_keyboard() -> InlineKeyboardMarkup:
 
 
 # Функция для создания клавиатуры на нужном языке
-def get_keyboard(language):
+def get_keyboard2(language2):
     keyboard = InlineKeyboardMarkup()
-    for button_data, button_text in button_texts.get(language, {}).items():
+    for button_data, button_text in button_texts.get(language2, {}).items():
         keyboard.add(InlineKeyboardButton(button_text, callback_data=button_data))
     return keyboard
 
@@ -100,13 +94,13 @@ def get_keyboard(language):
 # Измененный обработчик команды /start
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
-    user_id = message.from_user.id
+    user_id2 = message.from_user.id
     # Проверяем наличие пользователя в базе данных
-    existing_user = session.query(Language).filter_by(user_id=user_id).first()
+    existing_user = session.query(Language).filter_by(user_id=user_id2).first()
     if existing_user:
         # Пользователь уже есть в базе, предложить выбор операции
         await message.answer(get_operation_message(existing_user.language),
-                             reply_markup=get_keyboard(existing_user.language))
+                             reply_markup=get_keyboard2(existing_user.language))
     else:
         # Пользователь отсутствует в базе, предложить выбор языка
         markup = InlineKeyboardMarkup()
@@ -140,7 +134,7 @@ async def set_user_language(callback_query: types.CallbackQuery):
 
     # После выбора языка, предложите выбрать операцию
     await bot.send_message(user_id, get_operation_message(selected_language),
-                           reply_markup=get_keyboard(selected_language))
+                           reply_markup=get_keyboard2(selected_language))
 
 
 # Обработчик команды /language
@@ -156,7 +150,8 @@ async def set_language(message: types.Message):
 
 def get_user_language(user_id):
     user_language = session.query(Language).filter_by(user_id=user_id).first()
-    return user_language.language if user_language else "en"  # Вернуть английский язык по умолчанию, если язык не найден
+    return user_language.language if user_language else "en"  # Вернуть английский язык по умолчанию, если язык не
+    # найден
 
 
 # Обработчик нажатия на кнопку "Доллары в рубли"
@@ -259,7 +254,7 @@ async def process_usd_amount(message: types.Message, state: FSMContext):
         )
 
 
-################DB#####################
+################DB##################### # noqa E501
 
 Base = declarative_base()
 
